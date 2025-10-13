@@ -1,0 +1,78 @@
+services:
+  mongo:
+    image: mongodb/mongodb-community-server:latest
+    container_name: mongo
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo_data:/data/db
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - '5672:5672'   # RabbitMQ main port
+      - '15672:15672' # RabbitMQ management UI port
+
+  user-service:
+    build: ./user-service
+    container_name: user-service
+    ports:
+      - '3000:3000'
+    env_file:
+      - ./user-service/.env
+    depends_on:
+      - mongo
+      - rabbitmq
+
+  notification-service:
+    build: ./notification-service
+    container_name: notification-service
+    ports:
+      - '4002:4002'
+    env_file:
+      - ./notification-service/.env
+    depends_on:
+      - mongo
+      - rabbitmq
+
+  api-gateway-service:
+    build: ./api-gateway-service
+    container_name: api-gateway-service
+    ports:
+      - "8082:8082"
+    env_file:
+      - ./api-gateway-service/.env
+    depends_on:
+      - user-service
+      - book-service
+      - notification-service
+
+  book-service:
+    build: ./book-service
+    container_name: book-service
+    ports:
+      - '8081:8081'
+    depends_on:
+      - user-service
+      - rabbitmq
+      
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bookdb
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+
+  mysql:
+    image: mysql:8
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bookdb
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+volumes:
+  mongo_data:
+  mysql_data:
