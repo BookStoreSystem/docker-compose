@@ -11,7 +11,7 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - '5672:5672'   # RabbitMQ main port
+      - '5672:5672' # RabbitMQ main port
       - '15672:15672' # RabbitMQ management UI port
 
   user-service:
@@ -56,11 +56,24 @@ services:
     depends_on:
       - user-service
       - rabbitmq
-      
+
     environment:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/bookdb
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
+
+  static-frontend:
+    build:
+      context: ./book-store-frontend
+      dockerfile: Dockerfile
+    container_name: book-store-frontend
+    environment:
+      - PORT=3000
+      - GATEWAY_URL=http://api-gateway-service:8082
+    ports:
+      - "3002:3000" # serve app server on localhost:3002
+    depends_on:
+      - api-gateway-service
 
   mysql:
     image: mysql:8
