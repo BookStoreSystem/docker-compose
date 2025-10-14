@@ -11,7 +11,7 @@ services:
     image: rabbitmq:3-management
     container_name: rabbitmq
     ports:
-      - '5672:5672' # RabbitMQ main port
+      - '5672:5672'   # RabbitMQ main port
       - '15672:15672' # RabbitMQ management UI port
 
   user-service:
@@ -62,6 +62,57 @@ services:
       SPRING_DATASOURCE_USERNAME: root
       SPRING_DATASOURCE_PASSWORD: root
 
+  mysql:
+    image: mysql:8
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: bookdb
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+
+
+
+  order-postgres:
+    image: postgres:16
+    container_name: order-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root123
+      POSTGRES_DB: orderdb
+    ports: ["5435:5432"]
+    volumes: [ "pg_data:/var/lib/postgresql/data" ]
+
+  payment-postgres:
+    image: postgres:16
+    container_name: payment-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: root123
+      POSTGRES_DB: paymentdb
+    ports:
+      - "5436:5432"
+    volumes:
+      - pg_payment_data:/var/lib/postgresql/data
+
+  order-service:
+    build:
+      context: ./order-service
+      dockerfile: Dockerfile
+    container_name: order-service
+    ports: ["8083:8083"]
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://order-postgres:5432/orderdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: root123
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      USER_SERVICE_BASE_URL: http://user-service:3000
+    depends_on: [order-postgres, rabbitmq, user-service]
+
   static-frontend:
     build:
       context: ./book-store-frontend
@@ -74,18 +125,24 @@ services:
       - "3002:3000" # serve app server on localhost:3002
     depends_on:
       - api-gateway-service
-
-  mysql:
-    image: mysql:8
-    container_name: mysql
-    environment:
-      MYSQL_ROOT_PASSWORD: root
-      MYSQL_DATABASE: bookdb
+      
+  payment-service:
+    build: ./payment-service
+    container_name: payment-service
     ports:
-      - "3307:3306"
-    volumes:
-      - mysql_data:/var/lib/mysql
-
+      - "8084:8084"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://payment-postgres:5432/paymentdb
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: root123
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      EVENTS_EXCHANGE: events.exchange
+    depends_on:
+      - payment-postgres
+      - rabbitmq
 volumes:
   mongo_data:
   mysql_data:
+  pg_data:
+  pg_payment_data:
